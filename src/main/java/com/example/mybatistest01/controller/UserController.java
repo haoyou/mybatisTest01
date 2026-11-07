@@ -83,12 +83,6 @@ public class UserController {
         return CommonResult.success("success");
     }
 
-    @RequestMapping(value = "/user/test",method = RequestMethod.GET)
-    @ResponseBody
-    public void testStream(){
-        userService.testStream();
-    }
-
     @RequestMapping(value = "publicrs/user/test",method = RequestMethod.POST)
     @ResponseBody
     public String testPublicrs(){

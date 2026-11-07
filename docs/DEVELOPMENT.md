@@ -212,6 +212,9 @@ curl -i http://127.0.0.1:8080/user
 `application.yml`（主要配置，密码相关全部走环境变量）：
 
 ```yaml
+server:
+  port: 8080
+
 spring:
   # springfox 3 依赖 AntPathMatcher；Boot 2.6 默认的 PathPatternParser 会让 Swagger 接口列表变空
   mvc:
@@ -224,6 +227,8 @@ spring:
     password: ${DB_PASSWORD}
 
 mybatis:
+  mapper-locations: classpath:com/example/mybatistest01/mappers/*.xml
+  type-aliases-package: com.example.mybatistest01.entity
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl   # 控制台打印 SQL
 
@@ -234,14 +239,7 @@ jwt:
   tokenHead: Bearer            # token 前缀
 ```
 
-`application.properties`（历史遗留，仅两项）：
-
-```properties
-server.port=8080
-mybatis.mapper-locations=classpath:com/example/mybatistest01/mappers/*.xml
-```
-
-> 两份配置文件同时存在属于历史遗留，建议后续合并到 `application.yml`。
+> 原 `application.properties` 已合并进 `application.yml` 并删除，配置只有一处。
 
 ---
 
@@ -322,7 +320,6 @@ user_role.user_id ──► role.id ──► role.role_name ──► "ROLE_" +
 | GET | `/whoami` | 登录 | - | `CommonResult<{username, authorities}>` |
 | GET | `/user` | **ROLE_ADMIN** | - | `List<User>`（不含 password） |
 | POST | `/user/insert` | **ROLE_ADMIN** | `User`(JSON) | `CommonResult` |
-| GET | `/user/test` | 登录 | - | 无（当前空实现） |
 | POST | `/publicrs/user/test` | 公开 | - | `publicrs method` |
 | POST | `/publicrs/role/save` | **ROLE_ADMIN** | `{roleName}` | `CommonResult` |
 | POST | `/publicrs/role/search` | **ROLE_ADMIN** | `{roleId}` | `CommonResult<Role>` |
@@ -416,9 +413,7 @@ public CommonResult<List<Order>> list() { ... }
 
 | 优先级 | 问题 | 位置 | 说明 |
 |---|---|---|---|
-| 低 | `GET /user/test` 是空实现 | `UserServiceImpl:26` | 占位代码，建议删除 |
 | 低 | PageHelper 已引入但未使用 | `pom.xml` | 同时 `CommonPage` 也无人调用 |
-| 低 | `application.properties` 与 `application.yml` 并存 | `resources/` | 配置分散，建议合并 |
 | 低 | 无任何单元测试 | `src/test` | 仅有 Spring 默认的 `contextLoads` |
 | 低 | `mappers` 目录名拼写（应为 `mapper`） | 全项目 | 与 `mapper-locations` 一致，改名需同步 |
 
@@ -440,6 +435,7 @@ public CommonResult<List<Order>> list() { ... }
 | 8 | `docs` | 本文档 |
 | 9 | `feat(security)` | 角色 / 用户-角色接口收紧为 ADMIN，白名单只留认证入口 |
 | 10 | `feat(security)` | 数据库改用只授权单库的专用账号；`/user/insert` 收紧为 ADMIN 并补校验与密码编码 |
+| 11 | `chore` | 删除空的 `testStream` 与其接口；`application.properties` 合并进 `application.yml` |
 
 ---
 
