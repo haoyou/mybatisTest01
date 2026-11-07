@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.mybatistest01.mappers.UserMapper">
+    <resultMap id="userResultMap" type="com.example.mybatistest01.entity.User">
+        <id property="id" column="id" />
+        <result property="password" column="password" />
+        <result property="mobile" column="mobile" />
+        <result property="address" column="address" />
+        <result property="idCard" column="id_card" />
+        <result property="birthday" column="birthday" />
+        <result property="sex" column="sex" />
+        <result property="username" column="username" />
+        <result property="status" column="status" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+
+    </resultMap>
+    <sql id="user_column">id, password, mobile,id_card, address, birthday, sex, username, status, create_by, create_time, update_by, update_time</sql>
+    <select id="getUserList" resultType="com.example.mybatistest01.entity.User">
+        select
+            <include refid="user_column"/>
+        from user;
+    </select>
+    <select id="getUserByUserName" resultMap="userResultMap">
+        select
+            <include refid="user_column"/>
+        from user
+        where username = #{username}
+    </select>
+    <insert id="insertUser">
+        insert into user(<include refid="user_column"/>) values(#{id},#{password},#{mobile},#{idCard},#{address},#{birthday},#{sex},#{username},#{status},#{createBy},#{createTime},#{updateBy},#{updateTime})
+    </insert>
+
+</mapper>

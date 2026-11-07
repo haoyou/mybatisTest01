@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.mybatistest01.mappers.UserRoleMapper">
+    <resultMap id="userRoleResultMap" type="com.example.mybatistest01.entity.UserRole">
+        <id property="id" column="id" />
+        <result property="roleId" column="role_id" />
+        <result property="userId" column="user_id" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+    <sql id="user_role_column">id,role_id,user_id, create_by, create_time, update_by, update_time</sql>
+    <select id="getUserRoleListByUserId" resultMap="userRoleResultMap">
+        select
+            <include refid="user_role_column"/>
+        from user_role where user_id = #{userId}
+    </select>
+    <select id="getUserRoleListByUserIdAndRoleId" resultMap="userRoleResultMap">
+        select
+        <include refid="user_role_column"/>
+        from user_role where user_id = #{userId} and role_id = #{roleId}
+    </select>
+
+    <insert id="insertUserRole">
+        insert into user_role(<include refid="user_role_column"/>) values(#{id},#{roleId},#{userId},#{createBy},#{createTime},#{updateBy},#{updateTime})
+    </insert>
+
+</mapper>

@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: 'jdbc:mysql://
+${DB_HOST:localhost}
+:3306/test'
+    username: 
+${DB_USER:root}
+    password: 
+${DB_PASSWORD}
+
+#mybatis:
+#  mapper-locations: classpath:mappers/*.xml
+#  # type-aliases-package: com.chf.pojo
+#  configuration:
+#    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+mybatis:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+# custom jwt key
+jwt:
+  tokenHeader: Authorization
+  secret: mySecret
+  expiration: 604800
+  tokenHead: Bearer
