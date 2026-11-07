@@ -18,7 +18,7 @@
 
     </resultMap>
     <sql id="user_column">id, password, mobile,id_card, address, birthday, sex, username, status, create_by, create_time, update_by, update_time</sql>
-    <select id="getUserList" resultType="com.example.mybatistest01.entity.User">
+    <select id="getUserList" resultMap="userResultMap">
         select
             <include refid="user_column"/>
         from user;

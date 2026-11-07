@@ -4,6 +4,7 @@ import com.example.mybatistest01.annotation.CreateTime;
 import com.example.mybatistest01.annotation.IdKeyGenerator;
 import com.example.mybatistest01.annotation.UpdateTime;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -21,7 +22,11 @@ public class User {
     private long id;
     @ApiModelProperty("地址")
     private String address;
+    /**
+     * 只允许写入（注册 / 修改时接收），永远不参与序列化，避免接口把密码哈希返回给前端。
+     */
     @ApiModelProperty("密码")
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
     @ApiModelProperty("手机号码")
     private String mobile;
