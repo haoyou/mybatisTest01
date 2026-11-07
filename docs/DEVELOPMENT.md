@@ -1,0 +1,430 @@
+# mybatisTest01 开发文档
+
+> 一个 Spring Boot + MyBatis 的用户 / 角色权限管理示例，包含 JWT 无状态认证、MyBatis 插件自动填充、统一返回体。
+>
+> 最后更新：2026-11-08
+
+---
+
+## 1. 项目简介
+
+本项目实现了一套最小可用的 **RBAC（基于角色的访问控制）** 后端：
+
+- 用户注册 / 登录，密码 BCrypt 加密后入库
+- 登录成功签发 JWT，后续请求由过滤器校验，服务端不保存会话
+- 权限来自 `user_role` → `role` 关联，映射为 `ROLE_<角色名大写>`
+- 接口可用 `@PreAuthorize` 做角色级控制
+- 统一的 `CommonResult` 返回体 + 401/403 的 JSON 错误处理
+
+它同时是一个练手项目，用来演示：MyBatis XML 映射、自定义注解 + 拦截器自动填充主键与时间、雪花 ID、JWT 工具类。
+
+---
+
+## 2. 技术栈
+
+| 类别 | 选型 | 版本 |
+|---|---|---|
+| 语言 | Java | 1.8 |
+| 框架 | Spring Boot | 2.6.13 |
+| Web | spring-boot-starter-web | 随 Boot |
+| 持久层 | MyBatis（mybatis-spring-boot-starter） | 2.2.2 |
+| 安全 | spring-boot-starter-security | 随 Boot |
+| Token | JJWT（jjwt） | 0.9.0 |
+| 数据库 | MySQL 8（mysql-connector-j） | 8.0.31 |
+| 分页 | pagehelper-spring-boot-starter | 1.4.1（当前未使用） |
+| 文档 | springfox-boot-starter（Swagger 3） | 3.0.0 |
+| 工具 | Lombok / Hutool | 1.18.x / 4.5.7 |
+
+---
+
+## 3. 目录结构
+
+```
+mybatisTest01/
+├── pom.xml
+├── docs/
+│   └── DEVELOPMENT.md              # 本文档
+└── src/main/
+    ├── java/com/example/mybatistest01/
+    │   ├── MybatisTest01Application.java   # 启动类
+    │   ├── annotation/                     # @IdKeyGenerator @CreateTime @UpdateTime
+    │   ├── common/api/                     # CommonResult / ResultCode / IErrorCode / CommonPage
+    │   ├── config/
+    │   │   ├── SecurityConfig.java         # 无状态安全配置 + 白名单
+    │   │   ├── MybatisConfig.java          # 注册 MyBatis 拦截器
+    │   │   └── Swagger2Config.java         # Swagger 3 配置
+    │   ├── controller/                     # Authority / User / Role / UserRole
+    │   ├── dto/AuthorityDto.java           # UserDetails 适配层
+    │   ├── entity/                         # User / Role / UserRole
+    │   ├── idworker/IdWorker.java          # 雪花算法
+    │   ├── interceptor/CustomInterCeptor.java  # MyBatis 自动填充插件
+    │   ├── mappers/                        # Mapper 接口（@Mapper）
+    │   ├── security/                       # JWT 过滤器 + 401/403 处理器
+    │   ├── service/  service/impl/         # 业务层
+    │   ├── utils/JwtTokenUtil.java         # JWT 生成 / 解析 / 校验
+    │   └── vo/invo/                        # 入参对象
+    └── resources/
+        ├── application.yml                 # 数据源 + MyBatis + JWT
+        ├── application.properties          # 端口 + mapper-locations
+        └── com/example/mybatistest01/mappers/*.xml   # 与 Mapper 接口同包
+```
+
+---
+
+## 4. 快速开始
+
+### 4.1 环境要求
+
+- JDK 8
+- Maven 3.6+
+- MySQL 8（本项目开发库：`192.168.152.128:3306/mybatis_test01`）
+
+### 4.2 环境变量（**必读**）
+
+敏感信息不写在配置文件里，启动前必须提供：
+
+| 变量 | 是否必需 | 说明 |
+|---|---|---|
+| `DB_USER` | 可选 | 缺省 `root` |
+| `DB_PASSWORD` | **必需** | 缺失则启动失败（fail fast） |
+| `JWT_SECRET` | **必需** | JWT 签名密钥，建议 ≥64 字符随机串；缺失则启动失败 |
+
+设置方式（Windows）：
+
+```powershell
+setx DB_USER "root"
+setx DB_PASSWORD "你的数据库密码"
+setx JWT_SECRET "用随机串，例如 48 字节 Base64"
+```
+
+或在 IDEA 的 `Run → Edit Configurations → Environment variables` 里填写（存于 `.idea/`，已被 gitignore）。
+
+> 修改 `JWT_SECRET` 会让已签发的所有 token 立即失效，客户端需要重新登录。
+
+### 4.3 数据库初始化
+
+```sql
+CREATE DATABASE IF NOT EXISTS mybatis_test01
+  DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+
+USE mybatis_test01;
+
+CREATE TABLE `user` (
+  id          BIGINT       NOT NULL,
+  password    VARCHAR(128) NOT NULL,
+  mobile      VARCHAR(32)  DEFAULT NULL,
+  id_card     VARCHAR(32)  DEFAULT NULL,
+  address     VARCHAR(255) DEFAULT NULL,
+  birthday    DATETIME     DEFAULT NULL,
+  sex         VARCHAR(8)   DEFAULT NULL,
+  username    VARCHAR(64)  NOT NULL,
+  status      VARCHAR(16)  DEFAULT NULL,
+  create_by   VARCHAR(64)  DEFAULT NULL,
+  create_time DATETIME     DEFAULT NULL,
+  update_by   VARCHAR(64)  DEFAULT NULL,
+  update_time DATETIME     DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_user_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `role` (
+  id          BIGINT      NOT NULL,
+  role_name   VARCHAR(64) NOT NULL,
+  create_by   VARCHAR(64) DEFAULT NULL,
+  create_time DATETIME    DEFAULT NULL,
+  update_by   VARCHAR(64) DEFAULT NULL,
+  update_time DATETIME    DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_role_name (role_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `user_role` (
+  id          BIGINT      NOT NULL,
+  role_id     BIGINT      NOT NULL,
+  user_id     BIGINT      NOT NULL,
+  create_by   VARCHAR(64) DEFAULT NULL,
+  create_time DATETIME    DEFAULT NULL,
+  update_by   VARCHAR(64) DEFAULT NULL,
+  update_time DATETIME    DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY idx_user_role_user (user_id),
+  KEY idx_user_role_role (role_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+主键由雪花算法在插入时生成，**不需要**自增。
+
+### 4.4 启动与验证
+
+```bash
+# 启动（IDEA 里直接 Run MybatisTest01Application，或命令行）
+mvn spring-boot:run
+```
+
+```bash
+# 1) 公开接口
+curl "http://127.0.0.1:8080/hello?name=abc"
+# -> Hello abc
+
+# 2) 注册
+curl -X POST http://127.0.0.1:8080/publicrs/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice","password":"123456","address":"上海","mobile":"13800000000","idCard":"110101199001010011","sex":"F"}'
+
+# 3) 登录拿 token
+curl -X POST http://127.0.0.1:8080/publicrs/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice","password":"123456"}'
+
+# 4) 带 token 访问（/whoami 任意登录用户可访问）
+curl http://127.0.0.1:8080/whoami -H "Authorization: Bearer <token>"
+
+# 5) 无 token 访问受保护接口
+curl -i http://127.0.0.1:8080/user
+# -> 401 {"code":401,"message":"暂未登录或token已经过期","data":null}
+```
+
+---
+
+## 5. 配置说明
+
+`application.yml`（主要配置，密码相关全部走环境变量）：
+
+```yaml
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: 'jdbc:mysql://192.168.152.128:3306/mybatis_test01?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true'
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD}
+
+mybatis:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl   # 控制台打印 SQL
+
+jwt:
+  tokenHeader: Authorization   # 读取 token 的请求头
+  secret: ${JWT_SECRET}        # 签名密钥
+  expiration: 604800           # 过期秒数（7 天）
+  tokenHead: Bearer            # token 前缀
+```
+
+`application.properties`（历史遗留，仅两项）：
+
+```properties
+server.port=8080
+mybatis.mapper-locations=classpath:com/example/mybatistest01/mappers/*.xml
+```
+
+> 两份配置文件同时存在属于历史遗留，建议后续合并到 `application.yml`。
+
+---
+
+## 6. 认证与授权
+
+### 6.1 请求流程
+
+```
+Client
+  │  Authorization: Bearer <jwt>
+  ▼
+SecurityContextPersistenceFilter
+  ▼
+JwtAuthenticationTokenFilter        ← 本项目新增
+  │  1. 取 header，去掉 Bearer 前缀
+  │  2. 解析出 username（失败则跳过，不抛异常）
+  │  3. UserDetailsService 查库（user + user_role + role）
+  │  4. 校验签名与过期时间
+  │  5. 写入 SecurityContext（含 ROLE_* 权限）
+  ▼
+FilterSecurityInterceptor           ← 路径白名单匹配，未登录 → EntryPoint(401)
+  ▼
+Controller                          ← @PreAuthorize 校验角色，不足 → AccessDeniedHandler(403)
+```
+
+### 6.2 白名单（无需认证）
+
+```java
+"/", "/hello", "/publicrs/**",
+"/swagger-ui.html", "/swagger-ui/**", "/swagger-resources/**",
+"/v2/api-docs", "/v3/api-docs/**", "/webjars/**", "/doc.html", "/favicon.ico"
+```
+
+其余请求一律要求认证（`anyRequest().authenticated()`），会话策略为 `STATELESS`，`formLogin` / `httpBasic` 全部关闭。
+
+### 6.3 错误返回
+
+| 场景 | 状态码 | 响应 |
+|---|---|---|
+| 未携带 token / token 无效或过期 | 401 | `{"code":401,"message":"暂未登录或token已经过期","data":null}` |
+| 已登录但角色不足 | 403 | `{"code":403,"message":"没有相关权限","data":null}` |
+
+分别由 `RestAuthenticationEntryPoint` 与 `RestAccessDeniedHandler` 输出。
+
+### 6.4 角色来源
+
+```
+user_role.user_id ──► role.id ──► role.role_name ──► "ROLE_" + 大写
+```
+
+实现见 `UserDetailsServiceImpl#loadAuthorities`。因此数据库里存 `admin` 即可命中 `@PreAuthorize("hasRole('ADMIN')")`（`hasRole` 会自动补 `ROLE_` 前缀）。
+
+### 6.5 当前角色控制的接口
+
+`GET /user` 上的 `@PreAuthorize("hasRole('ADMIN')")`。
+
+### 6.6 自测接口
+
+`GET /whoami`：返回当前 token 对应的用户名与权限列表，用来排查"为什么 403"。
+
+```json
+{"code":200,"message":"操作成功","data":{"username":"alice","authorities":["ROLE_ADMIN"]}}
+```
+
+---
+
+## 7. 接口清单
+
+前缀说明：`publicrs/**` 为白名单（无需 token）；其余均需 `Authorization: Bearer <token>`。
+
+| 方法 | 路径 | 鉴权 | 入参 | 返回 |
+|---|---|---|---|---|
+| GET | `/hello` | 公开 | `name`(query, 可选) | 纯文本 `Hello xxx` |
+| POST | `/publicrs/auth/register` | 公开 | `RegisterUserInvo`(JSON) | `CommonResult` |
+| POST | `/publicrs/auth/login` | 公开 | `LoginUserInvo`(JSON) | `CommonResult<{token, tokenHead}>` |
+| GET | `/whoami` | 登录 | - | `CommonResult<{username, authorities}>` |
+| GET | `/user` | **ROLE_ADMIN** | - | `List<User>`（不含 password） |
+| POST | `/user/insert` | 登录 | `User`(JSON) | `success` |
+| GET | `/user/test` | 登录 | - | 无（当前空实现） |
+| POST | `/publicrs/user/test` | 公开 | - | `publicrs method` |
+| POST | `/publicrs/role/save` | 公开 | `{roleName}` | `CommonResult` |
+| POST | `/publicrs/role/search` | 公开 | `{roleId}` | `CommonResult<Role>` |
+| POST | `/publicrs/role/searchAll` | 公开 | - | `CommonResult<List<Role>>` |
+| POST | `/publicrs/userRole/save` | 公开 | `{userId, roleId}` | `CommonResult` |
+| POST | `/publicrs/userRole/search` | 公开 | `{userId}` | `CommonResult<List<UserRole>>` |
+
+入参对象字段：
+
+| 对象 | 字段 | 校验 |
+|---|---|---|
+| `RegisterUserInvo` | address, password, mobile, idCard, username | 均 `@NotBlank` |
+| | birthday, sex | 可选 |
+| `LoginUserInvo` | username, password | 均 `@NotBlank` |
+| `RoleInvo` | roleId, roleName | 业务层判空 |
+| `UserRoleInvo` | userId, roleId | 业务层判空 |
+
+统一返回体：
+
+```json
+{"code": 200, "message": "操作成功", "data": {}}
+```
+
+`code` 取值见 `ResultCode`：200 成功 / 401 未登录 / 403 无权限 / 404 参数校验失败 / 500 失败。
+
+---
+
+## 8. 数据模型
+
+```
+user (id, username, password, mobile, id_card, address, birthday, sex, status, 审计字段)
+role (id, role_name, 审计字段)
+user_role (id, user_id, role_id, 审计字段)
+```
+
+- `user.username` 唯一
+- `role.role_name` 唯一
+- `user_role` 无唯一约束，重复绑定需业务层判重（`UserRoleController` 已做）
+
+审计字段：`create_by / create_time / update_by / update_time`，由拦截器自动填充。
+
+---
+
+## 9. 框架机制
+
+### 9.1 MyBatis 自动填充插件
+
+`CustomInterCeptor` 拦截 `Executor.update`，按实体字段上的注解填充：
+
+| 注解 | 生效时机 | 作用 |
+|---|---|---|
+| `@IdKeyGenerator` | INSERT | 用雪花算法生成 `long` 主键 |
+| `@CreateTime` | INSERT | 写入当前时间 |
+| `@UpdateTime` | UPDATE | 刷新为当前时间 |
+
+`IdWorker` 的 workerId / datacenterId 在 `CustomInterCeptor` 中固定为 `(19, 1, 1)`，单机部署没问题；**多实例部署需要按机器分配**，否则可能生成重复 ID。
+
+### 9.2 统一返回体
+
+`CommonResult<T>` 提供 `success/failed/validateFailed/unauthorized/forbidden` 工厂方法；`ResultCode` 是错误码枚举。
+
+### 9.3 密码
+
+统一使用 `BCryptPasswordEncoder(10)`，`User.password` 标了 `@JsonProperty(access = WRITE_ONLY)`，**可以接收入参，但永远不会序列化输出**。
+
+---
+
+## 10. 开发约定
+
+**新增一个受保护接口：**
+
+```java
+@GetMapping("/orders")
+@PreAuthorize("hasRole('ADMIN')")     // 需要角色时加；不加则"登录即可"
+public CommonResult<List<Order>> list() { ... }
+```
+
+新增接口默认就在认证保护范围内，无需改 `SecurityConfig`；只有需要**公开**的路径才要加进白名单。
+
+**新增 Mapper：**
+
+1. 在 `mappers/` 下写 `@Mapper` 接口
+2. 在 `resources/com/example/mybatistest01/mappers/` 下写同名 XML
+3. 手写列清单时**必须**用 `resultMap`（或给 `application.yml` 打开 `map-underscore-to-camel-case`），否则 `id_card` 这类下划线列会映射丢失
+
+**SQL 日志**：已开 `StdOutImpl`，控制台可见完整 SQL 与参数。
+
+---
+
+## 11. 已知问题与技术债
+
+| 优先级 | 问题 | 位置 | 说明 |
+|---|---|---|---|
+| 高 | Swagger UI 能打开但**接口列表为空** | `Swagger2Config` | springfox 3 与 Boot 2.6 的 `PathPatternParser` 冲突。修复：`application.yml` 加 `spring.mvc.pathmatch.matching-strategy: ant_path_matcher` |
+| 高 | Swagger 的 SecurityContext 写死 `/brand/.*` | `Swagger2Config:61` | 从别的项目抄来的，导致 Authorize 按钮不对实际接口生效，应改成 `/**` |
+| 中 | 数据库使用 **root** 直连 | `application.yml` | 建议建只授权 `mybatis_test01` 的专用账号 |
+| 中 | `/user/insert` 无任何校验、无角色限制 | `UserController` | 任意登录用户可写入用户数据，且不校验字段 |
+| 中 | `publicrs/**` 下的角色 / 用户角色接口全部公开 | 各 Controller | 任何人都能建角色、给别人绑角色，等于绕过 RBAC |
+| 低 | `GET /user/test` 是空实现 | `UserServiceImpl:26` | 占位代码，建议删除 |
+| 低 | PageHelper 已引入但未使用 | `pom.xml` | 同时 `CommonPage` 也无人调用 |
+| 低 | `application.properties` 与 `application.yml` 并存 | `resources/` | 配置分散，建议合并 |
+| 低 | 无任何单元测试 | `src/test` | 仅有 Spring 默认的 `contextLoads` |
+| 低 | `mappers` 目录名拼写（应为 `mapper`） | 全项目 | 与 `mapper-locations` 一致，改名需同步 |
+
+---
+
+## 12. 版本历史（git）
+
+```
+d9f0d17  chore(config): read JWT signing secret from environment variable
+73e3d3f  chore: stop tracking generated code review report
+b481a5d  feat(security): require ADMIN role for GET /user
+f8b9773  chore(config): read datasource credentials from environment variables
+281ff98  feat(security): wire JWT authentication, fix user mapping and password leak
+8e5c8c4  chore: baseline before JWT refactor
+```
+
+> `281ff98` 是核心重构：接入 JWT 过滤器、从数据库装载权限、修复 `getUserList` 映射、屏蔽密码输出。
+
+---
+
+## 13. 常见问题排查
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| 启动报 `Could not resolve placeholder 'DB_PASSWORD'` | 环境变量没生效 | IDEA 需重启以继承 `setx` 的变量，或在运行配置里手填 |
+| 启动报 `Could not resolve placeholder 'JWT_SECRET'` | 同上 | 同上 |
+| 所有接口 500，日志 `Communications link failure` | 数据库不可达 | 检查 IP / 端口 / 安全组 / 账号密码 |
+| 登录 500，日志 `Unknown column 'xxx'` | 库表结构与实体不一致 | 对照第 4.3 节建表语句 |
+| 登录成功但访问接口 401 | token 未带或格式不对 | 必须 `Authorization: Bearer <token>`，注意 Bearer 后的空格 |
+| 访问接口 403 | 用户没有对应角色 | 看 `/whoami` 的 authorities；补 `user_role` 绑定后**重新登录** |
+| 改了角色没生效 | 权限在登录时装载 | 重新登录获取新 token |
