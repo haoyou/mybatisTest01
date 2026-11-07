@@ -21,7 +21,7 @@
     <select id="getUserList" resultMap="userResultMap">
         select
             <include refid="user_column"/>
-        from user;
+        from user
     </select>
     <select id="getUserByUserName" resultMap="userResultMap">
         select

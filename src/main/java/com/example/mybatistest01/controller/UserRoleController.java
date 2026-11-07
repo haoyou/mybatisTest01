@@ -20,9 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 用户-角色绑定。
+ * 用户-角色绑定（/admin/**）。
  * <p>
- * 给用户绑角色等于授予权限，所有接口都要求 ADMIN；路径上的 publicrs 前缀是历史遗留，不代表公开。
+ * 给用户绑角色等于授予权限，所有接口都要求 ADMIN。
  */
 @Api(tags = "UserRoleController", value = "用户-角色中间表管理")
 @RestController
@@ -31,7 +31,7 @@ public class UserRoleController {
     @Autowired
     private UserRoleService userRoleService;
 
-    @PostMapping("publicrs/userRole/save")
+    @PostMapping("admin/userRole/save")
     @ResponseBody
     @ApiOperation(value = "新增用户-角色")
     public CommonResult addUserRole(@RequestBody UserRoleInvo userRoleInvo) {
@@ -50,7 +50,7 @@ public class UserRoleController {
         return CommonResult.success(ResultCode.SUCCESS, result);
     }
 
-    @PostMapping("publicrs/userRole/search")
+    @PostMapping("admin/userRole/search")
     @ResponseBody
     @ApiOperation(value = "根据用户id查询用户角色列表")
     public CommonResult searchRoleById(@RequestBody UserRoleInvo userRoleInvo) {
@@ -58,7 +58,9 @@ public class UserRoleController {
             throw new RuntimeException(ResultCode.VALIDATE_FAILED.getMessage());
         }
         UserRole userRole = new UserRole();
-        BeanUtils.copyProperties(userRoleInvo, userRole);
+        // 这里只按 userId 查询，不要用 BeanUtils 整体拷贝：
+        // roleId 不在请求里时是 null，而 UserRole.roleId 是原始类型 long，拷贝会抛 IllegalArgumentException
+        userRole.setUserId(userRoleInvo.getUserId());
         List<UserRole> roles = userRoleService.getRoles(userRole);
         return CommonResult.success(roles);
     }

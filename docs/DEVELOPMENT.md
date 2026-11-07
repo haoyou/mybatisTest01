@@ -283,7 +283,7 @@ Controller                          ← @PreAuthorize 校验角色，不足 → 
 
 其余请求一律要求认证（`anyRequest().authenticated()`），会话策略为 `STATELESS`，`formLogin` / `httpBasic` 全部关闭。
 
-> `publicrs` 前缀是历史遗留命名，**不代表公开**：只有 `/publicrs/auth/**`（登录注册）和 `/publicrs/user/test`（演示）真正免认证，角色与用户-角色接口都要求 ADMIN。
+> `publicrs` 前缀是历史遗留命名，**不代表公开**：只有 `/publicrs/auth/**`（登录注册）和 `/publicrs/user/test`（演示）真正免认证。角色与用户-角色管理已迁移到 `/admin/**`，要求 ADMIN。
 
 ### 6.3 错误返回
 
@@ -327,13 +327,14 @@ user_role.user_id ──► role.id ──► role.role_name ──► "ROLE_" +
 | POST | `/publicrs/auth/login` | 公开 | `LoginUserInvo`(JSON) | `CommonResult<{token, tokenHead}>` |
 | GET | `/whoami` | 登录 | - | `CommonResult<{username, authorities}>` |
 | GET | `/user` | **ROLE_ADMIN** | - | `List<User>`（不含 password） |
+| GET | `/user/page` | **ROLE_ADMIN** | `pageNum`(默认1)、`pageSize`(默认10，上限100) | `CommonResult<CommonPage<User>>` |
 | POST | `/user/insert` | **ROLE_ADMIN** | `User`(JSON) | `CommonResult` |
 | POST | `/publicrs/user/test` | 公开 | - | `publicrs method` |
-| POST | `/publicrs/role/save` | **ROLE_ADMIN** | `{roleName}` | `CommonResult` |
-| POST | `/publicrs/role/search` | **ROLE_ADMIN** | `{roleId}` | `CommonResult<Role>` |
-| POST | `/publicrs/role/searchAll` | **ROLE_ADMIN** | - | `CommonResult<List<Role>>` |
-| POST | `/publicrs/userRole/save` | **ROLE_ADMIN** | `{userId, roleId}` | `CommonResult` |
-| POST | `/publicrs/userRole/search` | **ROLE_ADMIN** | `{userId}` | `CommonResult<List<UserRole>>` |
+| POST | `/admin/role/save` | **ROLE_ADMIN** | `{roleName}` | `CommonResult` |
+| POST | `/admin/role/search` | **ROLE_ADMIN** | `{roleId}` | `CommonResult<Role>` |
+| POST | `/admin/role/searchAll` | **ROLE_ADMIN** | - | `CommonResult<List<Role>>` |
+| POST | `/admin/userRole/save` | **ROLE_ADMIN** | `{userId, roleId}` | `CommonResult` |
+| POST | `/admin/userRole/search` | **ROLE_ADMIN** | `{userId}` | `CommonResult<List<UserRole>>` |
 
 入参对象字段：
 
@@ -421,7 +422,6 @@ public CommonResult<List<Order>> list() { ... }
 
 | 优先级 | 问题 | 位置 | 说明 |
 |---|---|---|---|
-| 低 | PageHelper 已引入但未使用 | `pom.xml` | 同时 `CommonPage` 也无人调用 |
 | 低 | `mappers` 目录名拼写（应为 `mapper`） | 全项目 | 与 `mapper-locations` 一致，改名需同步 |
 
 ---
@@ -444,6 +444,7 @@ public CommonResult<List<Order>> list() { ... }
 | 10 | `feat(security)` | 数据库改用只授权单库的专用账号；`/user/insert` 收紧为 ADMIN 并补校验与密码编码 |
 | 11 | `chore` | 删除空的 `testStream` 与其接口；`application.properties` 合并进 `application.yml` |
 | 12 | `test` | 新增 `SecuritySmokeTest`，固化 401 / 403 / 200 三条鉴权路径 |
+| 13 | `refactor` | 角色/绑定接口迁到 `/admin/**`；`/user/page` 用 PageHelper 实现分页，修复 SQL 末尾分号与 BeanUtils 原始类型拷贝两个 500 |
 
 ---
 
@@ -458,3 +459,5 @@ public CommonResult<List<Order>> list() { ... }
 | 登录成功但访问接口 401 | token 未带或格式不对 | 必须 `Authorization: Bearer <token>`，注意 Bearer 后的空格 |
 | 访问接口 403 | 用户没有对应角色 | 看 `/whoami` 的 authorities；补 `user_role` 绑定后**重新登录** |
 | 改了角色没生效 | 权限在登录时装载 | 重新登录获取新 token |
+| 分页接口 500，日志 `syntax error ... near 'LIMIT'` | Mapper SQL 末尾带了分号，PageHelper 追加 `LIMIT` 后变成 `from user; LIMIT ?` | 去掉语句结尾的 `;` |
+| 接口 500，日志只有 `java.lang.IllegalArgumentException: null` | `BeanUtils.copyProperties` 把 null 拷给**原始类型**字段（如 `long roleId`） | 改用 setter 逐字段赋值 |

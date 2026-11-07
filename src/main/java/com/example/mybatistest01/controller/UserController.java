@@ -16,11 +16,13 @@
 
 package com.example.mybatistest01.controller;
 
+import com.example.mybatistest01.common.api.CommonPage;
 import com.example.mybatistest01.common.api.CommonResult;
 import com.example.mybatistest01.common.api.ResultCode;
 import com.example.mybatistest01.entity.User;
 import com.example.mybatistest01.service.UserService;
 import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -35,6 +37,9 @@ import java.util.List;
 @RestController
 @Api(tags = "UserController",value = "用户管理")
 public class UserController {
+
+    private static final int MAX_PAGE_SIZE = 100;
+
     @Autowired
     private UserService userService;
 
@@ -57,6 +62,24 @@ public class UserController {
     @ResponseBody
     public List<User> getUserInfo(){
         return userService.findAll();
+    }
+
+    /**
+     * 分页查询用户（PageHelper）。
+     * <p>
+     * 返回 CommonPage：pageNum / pageSize / totalPage / total / list。
+     * pageSize 上限 100，避免一次拉太多。
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @ApiOperation(value = "分页查询用户")
+    @RequestMapping(value = "/user/page", method = RequestMethod.GET)
+    @ResponseBody
+    public CommonResult<CommonPage<User>> pageUserInfo(
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize) {
+        int safePageNum = Math.max(pageNum, 1);
+        int safePageSize = Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE);
+        return CommonResult.success(userService.findPage(safePageNum, safePageSize));
     }
 
     /**

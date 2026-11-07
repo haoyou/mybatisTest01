@@ -19,9 +19,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 角色管理。
+ * 角色管理（/admin/**）。
  * <p>
- * 角色是权限的源头，所有接口都要求 ADMIN；路径上的 publicrs 前缀是历史遗留，不代表公开。
+ * 角色是权限的源头，所有接口都要求 ADMIN。
  */
 @Api(tags = "RoleController", value = "角色管理")
 @RestController
@@ -30,7 +30,7 @@ public class RoleController {
     @Autowired
     private RoleService roleService;
 
-    @PostMapping("publicrs/role/save")
+    @PostMapping("admin/role/save")
     @ResponseBody
     @ApiOperation(value = "新增角色")
     public CommonResult addRole(@RequestBody RoleInvo roleInvo) {
@@ -47,7 +47,7 @@ public class RoleController {
         return CommonResult.success(ResultCode.SUCCESS, result);
     }
 
-    @PostMapping("publicrs/role/search")
+    @PostMapping("admin/role/search")
     @ResponseBody
     @ApiOperation(value = "根据id查询角色")
     public CommonResult searchRoleById(@RequestBody RoleInvo roleInvo) {
@@ -58,7 +58,7 @@ public class RoleController {
         return CommonResult.success(role);
     }
 
-    @PostMapping("publicrs/role/searchAll")
+    @PostMapping("admin/role/searchAll")
     @ResponseBody
     @ApiOperation(value = "查询所有角色")
     public CommonResult searchAllRole() {
