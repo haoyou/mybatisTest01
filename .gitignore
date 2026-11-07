@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# generated AI code review report
+code-review-report.html
