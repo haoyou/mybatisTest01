@@ -1,25 +1,23 @@
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: 'jdbc:mysql://
-${DB_HOST:localhost}
-:3306/test'
-    username: 
-${DB_USER:root}
-    password: 
-${DB_PASSWORD}
+    url: 'jdbc:mysql://192.168.152.128:3306/mybatis_test01?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true'
+    # 账号密码来自环境变量：DB_USER 缺省 root，DB_PASSWORD 必须显式提供（缺失则启动即失败，避免用空密码连库）
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD}
 
 #mybatis:
 #  mapper-locations: classpath:mappers/*.xml
-#  # type-aliases-package: com.chf.pojo
+#  #目的是为了省略resultType里的代码量
+##  type-aliases-package: com.chf.pojo
 #  configuration:
 #    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 mybatis:
-  configuration:
+  configuration: # 配置打印 MyBatis⽇志
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
-# custom jwt key
+# 自定义jwt key
 jwt:
-  tokenHeader: Authorization
-  secret: mySecret
-  expiration: 604800
-  tokenHead: Bearer
+  tokenHeader: Authorization #JWT存储的请求头
+  secret: mySecret #JWT加解密使用的密钥
+  expiration: 604800 #JWT的超限时间(60*60*24)
+  tokenHead: Bearer  #JWT负载中拿到开头
