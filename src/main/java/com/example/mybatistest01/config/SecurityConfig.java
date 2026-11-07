@@ -32,12 +32,16 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     /**
-     * 不需要认证即可访问的路径：健康检查、Swagger 文档、登录注册等 publicrs 接口。
+     * 不需要认证即可访问的路径。
+     * <p>
+     * 注意：只放行认证入口和演示接口。角色 / 用户角色管理虽然在 /publicrs 前缀下，
+     * 但**不在**白名单内，必须登录且具备 ADMIN 角色（见各 Controller 上的 @PreAuthorize）。
      */
     private static final String[] WHITELIST = {
             "/",
             "/hello",
-            "/publicrs/**",
+            "/publicrs/auth/**",
+            "/publicrs/user/test",
             "/swagger-ui.html",
             "/swagger-ui/**",
             "/swagger-resources/**",

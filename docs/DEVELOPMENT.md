@@ -249,12 +249,14 @@ Controller                          ← @PreAuthorize 校验角色，不足 → 
 ### 6.2 白名单（无需认证）
 
 ```java
-"/", "/hello", "/publicrs/**",
+"/", "/hello", "/publicrs/auth/**", "/publicrs/user/test",
 "/swagger-ui.html", "/swagger-ui/**", "/swagger-resources/**",
 "/v2/api-docs", "/v3/api-docs/**", "/webjars/**", "/doc.html", "/favicon.ico"
 ```
 
 其余请求一律要求认证（`anyRequest().authenticated()`），会话策略为 `STATELESS`，`formLogin` / `httpBasic` 全部关闭。
+
+> `publicrs` 前缀是历史遗留命名，**不代表公开**：只有 `/publicrs/auth/**`（登录注册）和 `/publicrs/user/test`（演示）真正免认证，角色与用户-角色接口都要求 ADMIN。
 
 ### 6.3 错误返回
 
@@ -289,7 +291,7 @@ user_role.user_id ──► role.id ──► role.role_name ──► "ROLE_" +
 
 ## 7. 接口清单
 
-前缀说明：`publicrs/**` 为白名单（无需 token）；其余均需 `Authorization: Bearer <token>`。
+前缀说明：`/publicrs/auth/**` 与 `/publicrs/user/test` 免 token；其余均需 `Authorization: Bearer <token>`，标注 **ROLE_ADMIN** 的还要求该角色。
 
 | 方法 | 路径 | 鉴权 | 入参 | 返回 |
 |---|---|---|---|---|
@@ -301,11 +303,11 @@ user_role.user_id ──► role.id ──► role.role_name ──► "ROLE_" +
 | POST | `/user/insert` | 登录 | `User`(JSON) | `success` |
 | GET | `/user/test` | 登录 | - | 无（当前空实现） |
 | POST | `/publicrs/user/test` | 公开 | - | `publicrs method` |
-| POST | `/publicrs/role/save` | 公开 | `{roleName}` | `CommonResult` |
-| POST | `/publicrs/role/search` | 公开 | `{roleId}` | `CommonResult<Role>` |
-| POST | `/publicrs/role/searchAll` | 公开 | - | `CommonResult<List<Role>>` |
-| POST | `/publicrs/userRole/save` | 公开 | `{userId, roleId}` | `CommonResult` |
-| POST | `/publicrs/userRole/search` | 公开 | `{userId}` | `CommonResult<List<UserRole>>` |
+| POST | `/publicrs/role/save` | **ROLE_ADMIN** | `{roleName}` | `CommonResult` |
+| POST | `/publicrs/role/search` | **ROLE_ADMIN** | `{roleId}` | `CommonResult<Role>` |
+| POST | `/publicrs/role/searchAll` | **ROLE_ADMIN** | - | `CommonResult<List<Role>>` |
+| POST | `/publicrs/userRole/save` | **ROLE_ADMIN** | `{userId, roleId}` | `CommonResult` |
+| POST | `/publicrs/userRole/search` | **ROLE_ADMIN** | `{userId}` | `CommonResult<List<UserRole>>` |
 
 入参对象字段：
 
@@ -395,7 +397,6 @@ public CommonResult<List<Order>> list() { ... }
 |---|---|---|---|
 | 中 | 数据库使用 **root** 直连 | `application.yml` | 建议建只授权 `mybatis_test01` 的专用账号 |
 | 中 | `/user/insert` 无任何校验、无角色限制 | `UserController` | 任意登录用户可写入用户数据，且不校验字段 |
-| 中 | `publicrs/**` 下的角色 / 用户角色接口全部公开 | 各 Controller | 任何人都能建角色、给别人绑角色，等于绕过 RBAC |
 | 低 | `GET /user/test` 是空实现 | `UserServiceImpl:26` | 占位代码，建议删除 |
 | 低 | PageHelper 已引入但未使用 | `pom.xml` | 同时 `CommonPage` 也无人调用 |
 | 低 | `application.properties` 与 `application.yml` 并存 | `resources/` | 配置分散，建议合并 |
@@ -418,6 +419,7 @@ public CommonResult<List<Order>> list() { ... }
 | 6 | `chore(config)` | JWT 签名密钥改走环境变量（并轮换密钥） |
 | 7 | `fix(swagger)` | 修正 path-match 策略与 SecurityContext 范围，Swagger 恢复可用 |
 | 8 | `docs` | 本文档 |
+| 9 | `feat(security)` | 角色 / 用户-角色接口收紧为 ADMIN，白名单只留认证入口 |
 
 ---
 
