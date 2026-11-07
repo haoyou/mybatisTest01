@@ -1,4 +1,8 @@
 spring:
+  # springfox 3 依赖 AntPathMatcher；Boot 2.6 默认的 PathPatternParser 会让 Swagger 文档里的接口全部为空
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: 'jdbc:mysql://192.168.152.128:3306/mybatis_test01?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true'

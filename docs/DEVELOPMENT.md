@@ -192,6 +192,10 @@ curl -i http://127.0.0.1:8080/user
 
 ```yaml
 spring:
+  # springfox 3 依赖 AntPathMatcher；Boot 2.6 默认的 PathPatternParser 会让 Swagger 接口列表变空
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: 'jdbc:mysql://192.168.152.128:3306/mybatis_test01?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true'
@@ -389,8 +393,6 @@ public CommonResult<List<Order>> list() { ... }
 
 | 优先级 | 问题 | 位置 | 说明 |
 |---|---|---|---|
-| 高 | Swagger UI 能打开但**接口列表为空** | `Swagger2Config` | springfox 3 与 Boot 2.6 的 `PathPatternParser` 冲突。修复：`application.yml` 加 `spring.mvc.pathmatch.matching-strategy: ant_path_matcher` |
-| 高 | Swagger 的 SecurityContext 写死 `/brand/.*` | `Swagger2Config:61` | 从别的项目抄来的，导致 Authorize 按钮不对实际接口生效，应改成 `/**` |
 | 中 | 数据库使用 **root** 直连 | `application.yml` | 建议建只授权 `mybatis_test01` 的专用账号 |
 | 中 | `/user/insert` 无任何校验、无角色限制 | `UserController` | 任意登录用户可写入用户数据，且不校验字段 |
 | 中 | `publicrs/**` 下的角色 / 用户角色接口全部公开 | 各 Controller | 任何人都能建角色、给别人绑角色，等于绕过 RBAC |
@@ -404,16 +406,18 @@ public CommonResult<List<Order>> list() { ... }
 
 ## 12. 版本历史（git）
 
-```
-d9f0d17  chore(config): read JWT signing secret from environment variable
-73e3d3f  chore: stop tracking generated code review report
-b481a5d  feat(security): require ADMIN role for GET /user
-f8b9773  chore(config): read datasource credentials from environment variables
-281ff98  feat(security): wire JWT authentication, fix user mapping and password leak
-8e5c8c4  chore: baseline before JWT refactor
-```
+按时间顺序（哈希会随历史重写而变，这里只列主题）：
 
-> `281ff98` 是核心重构：接入 JWT 过滤器、从数据库装载权限、修复 `getUserList` 映射、屏蔽密码输出。
+| # | 主题 | 内容 |
+|---|---|---|
+| 1 | `baseline` | 原始代码，含旧的数据库配置与内存用户 |
+| 2 | `feat(security)` | 接入 JWT 过滤器、从数据库装载权限、修复 `getUserList` 映射、屏蔽密码输出 |
+| 3 | `chore(config)` | 数据源账号密码改走环境变量 |
+| 4 | `feat(security)` | `GET /user` 要求 `ROLE_ADMIN` |
+| 5 | `chore` | 停止跟踪生成的评审报告，并清洗历史里的明文凭据 |
+| 6 | `chore(config)` | JWT 签名密钥改走环境变量（并轮换密钥） |
+| 7 | `fix(swagger)` | 修正 path-match 策略与 SecurityContext 范围，Swagger 恢复可用 |
+| 8 | `docs` | 本文档 |
 
 ---
 

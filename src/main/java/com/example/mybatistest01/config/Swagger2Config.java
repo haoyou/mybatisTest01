@@ -55,18 +55,17 @@ public class Swagger2Config {
         return result;
     }
 
+    /**
+     * 对所有接口生效：Swagger UI 上的 Authorize 按钮会把 token 带到每个请求的 Authorization 头。
+     * （原实现写死为 /brand/.*，是从别的项目抄来的，导致本项目接口全都用不上这个配置。）
+     */
     private List<SecurityContext> securityContexts() {
-        //设置需要登录认证的路径
         List<SecurityContext> result = new ArrayList<>();
-        result.add(getContextByPath("/brand/.*"));
-        return result;
-    }
-
-    private SecurityContext getContextByPath(String pathRegex) {
-        return SecurityContext.builder()
+        result.add(SecurityContext.builder()
                 .securityReferences(defaultAuth())
-                .forPaths(PathSelectors.regex(pathRegex))
-                .build();
+                .forPaths(PathSelectors.any())
+                .build());
+        return result;
     }
 
     private List<SecurityReference> defaultAuth() {
