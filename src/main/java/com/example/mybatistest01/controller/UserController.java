@@ -16,11 +16,15 @@
 
 package com.example.mybatistest01.controller;
 
+import com.example.mybatistest01.common.api.CommonResult;
+import com.example.mybatistest01.common.api.ResultCode;
 import com.example.mybatistest01.entity.User;
 import com.example.mybatistest01.service.UserService;
 import io.swagger.annotations.Api;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -33,6 +37,9 @@ import java.util.List;
 public class UserController {
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     // http://127.0.0.1:8080/hello?name=lisi
     @RequestMapping(value = "/hello",method = RequestMethod.GET)
@@ -51,11 +58,29 @@ public class UserController {
     public List<User> getUserInfo(){
         return userService.findAll();
     }
+
+    /**
+     * 新增用户，仅 ADMIN 可调用。
+     * <p>
+     * 与公开的 /publicrs/auth/register 不同，这里不做"自助注册"，因此：
+     * 用户名、密码必填；密码会用 BCrypt 编码后入库（否则存进去的明文永远登录不上）；
+     * 用户名重复直接拒绝。
+     */
+    @PreAuthorize("hasRole('ADMIN')")
     @RequestMapping(value = "/user/insert",method = RequestMethod.POST)
     @ResponseBody
-    public String insertUserInfo(@RequestBody User user){
+    public CommonResult<String> insertUserInfo(@RequestBody User user){
+        if (user == null
+                || !StringUtils.hasText(user.getUsername())
+                || !StringUtils.hasText(user.getPassword())) {
+            return CommonResult.validateFailed("用户名和密码不能为空");
+        }
+        if (userService.getUsersByUserName(user) != null) {
+            return CommonResult.failed(ResultCode.DATA_EXIST_FAILED.getMessage());
+        }
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
         userService.insert(user);
-        return "success";
+        return CommonResult.success("success");
     }
 
     @RequestMapping(value = "/user/test",method = RequestMethod.GET)

@@ -85,14 +85,14 @@ mybatisTest01/
 
 | 变量 | 是否必需 | 说明 |
 |---|---|---|
-| `DB_USER` | 可选 | 缺省 `root` |
+| `DB_USER` | 可选 | 缺省 `root`，**实际部署请用专用账号**（见 4.3.1） |
 | `DB_PASSWORD` | **必需** | 缺失则启动失败（fail fast） |
 | `JWT_SECRET` | **必需** | JWT 签名密钥，建议 ≥64 字符随机串；缺失则启动失败 |
 
 设置方式（Windows）：
 
 ```powershell
-setx DB_USER "root"
+setx DB_USER "app_user"
 setx DB_PASSWORD "你的数据库密码"
 setx JWT_SECRET "用随机串，例如 48 字节 Base64"
 ```
@@ -153,6 +153,27 @@ CREATE TABLE `user_role` (
 ```
 
 主键由雪花算法在插入时生成，**不需要**自增。
+
+### 4.3.1 专用数据库账号（不要用 root 连库）
+
+应用只需要 DML 权限，建账号时只授权 `mybatis_test01` 这一个库：
+
+```sql
+CREATE USER IF NOT EXISTS 'app_user'@'%' IDENTIFIED BY '换成强密码';
+GRANT SELECT, INSERT, UPDATE, DELETE ON mybatis_test01.* TO 'app_user'@'%';
+FLUSH PRIVILEGES;
+```
+
+验证：
+
+```sql
+-- 能查
+SELECT COUNT(*) FROM mybatis_test01.`user`;
+-- 不能建表（应当报 CREATE command denied）
+CREATE TABLE mybatis_test01.should_fail (id INT);
+```
+
+> MySQL 8 默认启用 `validate_password`，密码需同时包含大写、小写、数字和符号，否则 `CREATE USER` 会报 `Your password does not satisfy the current policy requirements`。
 
 ### 4.4 启动与验证
 
@@ -300,7 +321,7 @@ user_role.user_id ──► role.id ──► role.role_name ──► "ROLE_" +
 | POST | `/publicrs/auth/login` | 公开 | `LoginUserInvo`(JSON) | `CommonResult<{token, tokenHead}>` |
 | GET | `/whoami` | 登录 | - | `CommonResult<{username, authorities}>` |
 | GET | `/user` | **ROLE_ADMIN** | - | `List<User>`（不含 password） |
-| POST | `/user/insert` | 登录 | `User`(JSON) | `success` |
+| POST | `/user/insert` | **ROLE_ADMIN** | `User`(JSON) | `CommonResult` |
 | GET | `/user/test` | 登录 | - | 无（当前空实现） |
 | POST | `/publicrs/user/test` | 公开 | - | `publicrs method` |
 | POST | `/publicrs/role/save` | **ROLE_ADMIN** | `{roleName}` | `CommonResult` |
@@ -395,8 +416,6 @@ public CommonResult<List<Order>> list() { ... }
 
 | 优先级 | 问题 | 位置 | 说明 |
 |---|---|---|---|
-| 中 | 数据库使用 **root** 直连 | `application.yml` | 建议建只授权 `mybatis_test01` 的专用账号 |
-| 中 | `/user/insert` 无任何校验、无角色限制 | `UserController` | 任意登录用户可写入用户数据，且不校验字段 |
 | 低 | `GET /user/test` 是空实现 | `UserServiceImpl:26` | 占位代码，建议删除 |
 | 低 | PageHelper 已引入但未使用 | `pom.xml` | 同时 `CommonPage` 也无人调用 |
 | 低 | `application.properties` 与 `application.yml` 并存 | `resources/` | 配置分散，建议合并 |
@@ -420,6 +439,7 @@ public CommonResult<List<Order>> list() { ... }
 | 7 | `fix(swagger)` | 修正 path-match 策略与 SecurityContext 范围，Swagger 恢复可用 |
 | 8 | `docs` | 本文档 |
 | 9 | `feat(security)` | 角色 / 用户-角色接口收紧为 ADMIN，白名单只留认证入口 |
+| 10 | `feat(security)` | 数据库改用只授权单库的专用账号；`/user/insert` 收紧为 ADMIN 并补校验与密码编码 |
 
 ---
 
