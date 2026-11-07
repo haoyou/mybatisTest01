@@ -205,6 +205,14 @@ curl -i http://127.0.0.1:8080/user
 # -> 401 {"code":401,"message":"暂未登录或token已经过期","data":null}
 ```
 
+### 4.5 运行测试
+
+```bash
+mvn test          # 或在 IDEA 里直接 Run SecuritySmokeTest
+```
+
+`SecuritySmokeTest` 用 MockMvc + Mock Service 覆盖 6 条路径（公开接口、无 token 401、无效 token 401、普通用户 403、ADMIN 200、登录返回 token），**不需要连接数据库**，改鉴权逻辑后应保持全绿。
+
 ---
 
 ## 5. 配置说明
@@ -414,7 +422,6 @@ public CommonResult<List<Order>> list() { ... }
 | 优先级 | 问题 | 位置 | 说明 |
 |---|---|---|---|
 | 低 | PageHelper 已引入但未使用 | `pom.xml` | 同时 `CommonPage` 也无人调用 |
-| 低 | 无任何单元测试 | `src/test` | 仅有 Spring 默认的 `contextLoads` |
 | 低 | `mappers` 目录名拼写（应为 `mapper`） | 全项目 | 与 `mapper-locations` 一致，改名需同步 |
 
 ---
@@ -436,6 +443,7 @@ public CommonResult<List<Order>> list() { ... }
 | 9 | `feat(security)` | 角色 / 用户-角色接口收紧为 ADMIN，白名单只留认证入口 |
 | 10 | `feat(security)` | 数据库改用只授权单库的专用账号；`/user/insert` 收紧为 ADMIN 并补校验与密码编码 |
 | 11 | `chore` | 删除空的 `testStream` 与其接口；`application.properties` 合并进 `application.yml` |
+| 12 | `test` | 新增 `SecuritySmokeTest`，固化 401 / 403 / 200 三条鉴权路径 |
 
 ---
 
