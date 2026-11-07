@@ -18,6 +18,8 @@ mybatis:
 # 自定义jwt key
 jwt:
   tokenHeader: Authorization #JWT存储的请求头
-  secret: mySecret #JWT加解密使用的密钥
+  # 签名密钥来自环境变量 JWT_SECRET；必须显式提供，缺失则启动失败。
+  # 注意：更换该值会让已签发的 token 全部失效。
+  secret: ${JWT_SECRET}
   expiration: 604800 #JWT的超限时间(60*60*24)
   tokenHead: Bearer  #JWT负载中拿到开头
