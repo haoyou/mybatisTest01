@@ -20,7 +20,7 @@ import com.example.mybatistest01.entity.User;
 import com.example.mybatistest01.service.UserService;
 import io.swagger.annotations.Api;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -33,10 +33,6 @@ import java.util.List;
 public class UserController {
     @Autowired
     private UserService userService;
-//    @Value("${jwt.tokenHeader}")
-//    private String tokenHeader;
-//    @Value("${jwt.tokenHead}")
-//    private String tokenHead;
 
     // http://127.0.0.1:8080/hello?name=lisi
     @RequestMapping(value = "/hello",method = RequestMethod.GET)
@@ -45,6 +41,11 @@ public class UserController {
         return "Hello " + name;
     }
 
+    /**
+     * 查看全部用户，只有 admin 角色可以访问。
+     * 权限不通过时由 RestAccessDeniedHandler 返回 JSON 403。
+     */
+    @PreAuthorize("hasRole('ADMIN')")
     @RequestMapping(value = "/user",method = RequestMethod.GET)
     @ResponseBody
     public List<User> getUserInfo(){
@@ -68,9 +69,5 @@ public class UserController {
     public String testPublicrs(){
         return "publicrs method";
     }
-
-
-
-
 
 }
